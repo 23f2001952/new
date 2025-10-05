@@ -43,10 +43,20 @@ async def latency_options():
 async def check_latency(req: LatencyRequest):
     if not telemetry:
         raise HTTPException(status_code=500, detail="Telemetry data not available")
+    return calculate_metrics(req.regions, req.threshold_ms)
 
+# GET endpoint to allow testing via browser
+@app.get("/latency")
+async def get_latency():
+    # Example default GET query: all regions, threshold 180
+    default_threshold = 180
+    all_regions = list({r["region"] for r in telemetry})
+    return calculate_metrics(all_regions, default_threshold)
+
+# Shared function to calculate metrics
+def calculate_metrics(regions, threshold_ms):
     response = {}
-
-    for region in req.regions:
+    for region in regions:
         region_data = [r for r in telemetry if r["region"] == region]
 
         if not region_data:
@@ -61,19 +71,12 @@ async def check_latency(req: LatencyRequest):
         latencies = [r["latency_ms"] for r in region_data]
         uptimes = [r["uptime_pct"] for r in region_data]
 
-        # avg_latency
         avg_latency = sum(latencies) / len(latencies)
-
-        # p95_latency
         sorted_lat = sorted(latencies)
         idx = int(0.95 * len(sorted_lat)) - 1
         p95_latency = sorted_lat[max(idx, 0)]
-
-        # avg_uptime
         avg_uptime = sum(uptimes) / len(uptimes)
-
-        # breaches
-        breaches = sum(1 for l in latencies if l > req.threshold_ms)
+        breaches = sum(1 for l in latencies if l > threshold_ms)
 
         response[region] = {
             "avg_latency": round(avg_latency, 2),
@@ -81,5 +84,4 @@ async def check_latency(req: LatencyRequest):
             "avg_uptime": round(avg_uptime, 3),
             "breaches": breaches
         }
-
     return response
