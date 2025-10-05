@@ -1,4 +1,5 @@
 # api/index.py
+import numpy as np
 from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -81,20 +82,17 @@ def calculate_metrics(regions, threshold_ms):
         latencies = [r["latency_ms"] for r in region_data]
         uptimes = [r["uptime_pct"] for r in region_data]
 
-        avg_latency = sum(latencies) / len(latencies)
-        sorted_lat = sorted(latencies)
-        idx = int(0.95 * len(sorted_lat)) - 1
-        p95_latency = sorted_lat[max(idx, 0)]
-        avg_uptime = sum(uptimes) / len(uptimes)
+        avg_latency = round(sum(latencies) / len(latencies), 2)
+        p95_latency = round(np.percentile(latencies, 95, interpolation='linear'), 2)
+        avg_uptime = round(sum(uptimes) / len(uptimes), 3)
         breaches = sum(1 for l in latencies if l > threshold_ms)
 
         response.append({
             "region": region,
-            "avg_latency": round(avg_latency, 2),
-            "p95_latency": round(p95_latency, 2),
-            "avg_uptime": round(avg_uptime, 3),
+            "avg_latency": avg_latency,
+            "p95_latency": p95_latency,
+            "avg_uptime": avg_uptime,
             "breaches": breaches
         })
 
-    # Wrap in a "regions" key
     return {"regions": response}
