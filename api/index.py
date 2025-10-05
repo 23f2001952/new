@@ -1,5 +1,5 @@
 # api/index.py
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
@@ -27,33 +27,42 @@ app = FastAPI()
 # Enable CORS for all origins and methods
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # Allow any origin
-    allow_methods=["*"],      # Allow POST, GET, OPTIONS, etc.
-    allow_headers=["*"],      # Allow all headers
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
     allow_credentials=False
 )
 
-# OPTIONS preflight route to handle CORS
+# Helper to add private network header
+def add_private_network_header(resp: Response):
+    resp.headers["Access-Control-Allow-Private-Network"] = "true"
+    return resp
+
+# OPTIONS preflight route
 @app.options("/latency")
 async def latency_options():
-    return Response(status_code=200)
+    resp = Response(status_code=204)
+    return add_private_network_header(resp)
 
-# POST endpoint to calculate metrics
+# POST endpoint
 @app.post("/latency")
-async def check_latency(req: LatencyRequest):
+async def check_latency(req: LatencyRequest, resp: Response):
     if not telemetry:
         raise HTTPException(status_code=500, detail="Telemetry data not available")
-    return calculate_metrics(req.regions, req.threshold_ms)
+    data = calculate_metrics(req.regions, req.threshold_ms)
+    add_private_network_header(resp)
+    return data
 
-# GET endpoint to allow testing via browser
+# GET endpoint
 @app.get("/latency")
-async def get_latency():
-    # Example default GET query: all regions, threshold 180
+async def get_latency(resp: Response):
     default_threshold = 180
     all_regions = list({r["region"] for r in telemetry})
-    return calculate_metrics(all_regions, default_threshold)
+    data = calculate_metrics(all_regions, default_threshold)
+    add_private_network_header(resp)
+    return data
 
-# Shared function to calculate metrics
+# Shared metrics calculation
 def calculate_metrics(regions, threshold_ms):
     response = {}
     for region in regions:
