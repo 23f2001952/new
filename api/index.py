@@ -61,18 +61,21 @@ async def get_latency():
     return calculate_metrics(all_regions, default_threshold)
 
 # Shared metrics calculation
+# Shared metrics calculation
 def calculate_metrics(regions, threshold_ms):
-    response = {}
+    response = []
+
     for region in regions:
         region_data = [r for r in telemetry if r["region"] == region]
 
         if not region_data:
-            response[region] = {
+            response.append({
+                "region": region,
                 "avg_latency": None,
                 "p95_latency": None,
                 "avg_uptime": None,
                 "breaches": 0
-            }
+            })
             continue
 
         latencies = [r["latency_ms"] for r in region_data]
@@ -85,10 +88,13 @@ def calculate_metrics(regions, threshold_ms):
         avg_uptime = sum(uptimes) / len(uptimes)
         breaches = sum(1 for l in latencies if l > threshold_ms)
 
-        response[region] = {
+        response.append({
+            "region": region,
             "avg_latency": round(avg_latency, 2),
             "p95_latency": round(p95_latency, 2),
             "avg_uptime": round(avg_uptime, 3),
             "breaches": breaches
-        }
-    return response
+        })
+
+    # Wrap in a "regions" key
+    return {"regions": response}
