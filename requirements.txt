@@ -1,4 +1,3 @@
 fastapi
 pydantic
-json
-statistics
+uvicorn
