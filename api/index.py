@@ -1,14 +1,22 @@
 # api/index.py
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Request
 from pydantic import BaseModel
+import os
 import json
 import statistics
 
 # Load telemetry data once at startup
-with open("q-vercel-latency.json") as f:
-    telemetry = json.load(f)
+try:
+    json_path = os.path.join(os.path.dirname(__file__), "q-vercel-latency.json")
+    with open(json_path, "r") as f:
+        telemetry = json.load(f)
+except FileNotFoundError:
+    telemetry = []
+    print(f"Warning: telemetry file not found at {json_path}")
+except json.JSONDecodeError:
+    telemetry = []
+    print(f"Warning: telemetry file is not valid JSON at {json_path}")
 
 # Define request body model
 class LatencyRequest(BaseModel):
@@ -27,6 +35,9 @@ app.add_middleware(
 
 @app.post("/latency")
 async def check_latency(req: LatencyRequest):
+    if not telemetry:
+        raise HTTPException(status_code=500, detail="Telemetry data not available")
+
     response = {}
 
     for region in req.regions:
@@ -50,7 +61,7 @@ async def check_latency(req: LatencyRequest):
         # p95_latency
         sorted_lat = sorted(latencies)
         idx = int(0.95 * len(sorted_lat)) - 1
-        p95_latency = sorted_lat[max(idx,0)]
+        p95_latency = sorted_lat[max(idx, 0)]
 
         # avg_uptime
         avg_uptime = sum(uptimes) / len(uptimes)
