@@ -33,34 +33,31 @@ app.add_middleware(
     allow_credentials=False
 )
 
-# Helper to add private network header
-def add_private_network_header(resp: Response):
-    resp.headers["Access-Control-Allow-Private-Network"] = "true"
-    return resp
+# Middleware to add Access-Control-Allow-Private-Network to all responses
+@app.middleware("http")
+async def add_pna_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 # OPTIONS preflight route
 @app.options("/latency")
 async def latency_options():
-    resp = Response(status_code=204)
-    return add_private_network_header(resp)
+    return Response(status_code=204)
 
 # POST endpoint
 @app.post("/latency")
-async def check_latency(req: LatencyRequest, resp: Response):
+async def check_latency(req: LatencyRequest):
     if not telemetry:
         raise HTTPException(status_code=500, detail="Telemetry data not available")
-    data = calculate_metrics(req.regions, req.threshold_ms)
-    add_private_network_header(resp)
-    return data
+    return calculate_metrics(req.regions, req.threshold_ms)
 
 # GET endpoint
 @app.get("/latency")
-async def get_latency(resp: Response):
+async def get_latency():
     default_threshold = 180
     all_regions = list({r["region"] for r in telemetry})
-    data = calculate_metrics(all_regions, default_threshold)
-    add_private_network_header(resp)
-    return data
+    return calculate_metrics(all_regions, default_threshold)
 
 # Shared metrics calculation
 def calculate_metrics(regions, threshold_ms):
