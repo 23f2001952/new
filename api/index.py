@@ -1,10 +1,9 @@
 # api/index.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import json
-import statistics
 
 # Load telemetry data once at startup
 try:
@@ -18,22 +17,28 @@ except json.JSONDecodeError:
     telemetry = []
     print(f"Warning: telemetry file is not valid JSON at {json_path}")
 
-# Define request body model
+# Request body model
 class LatencyRequest(BaseModel):
     regions: list[str]
     threshold_ms: float
 
 app = FastAPI()
 
-# Enable CORS for all origins and POST
+# Enable CORS for all origins and methods
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    allow_credentials=False 
+    allow_origins=["*"],      # Allow any origin
+    allow_methods=["*"],      # Allow POST, GET, OPTIONS, etc.
+    allow_headers=["*"],      # Allow all headers
+    allow_credentials=False
 )
 
+# OPTIONS preflight route to handle CORS
+@app.options("/latency")
+async def latency_options():
+    return Response(status_code=200)
+
+# POST endpoint to calculate metrics
 @app.post("/latency")
 async def check_latency(req: LatencyRequest):
     if not telemetry:
